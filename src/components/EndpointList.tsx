@@ -107,13 +107,16 @@ function EndpointCard({
   isTesting?: boolean;
   onVerifyClick?: (endpoint: Endpoint) => void;
   isVerifying?: boolean;
-  onRetryAllClick?: (endpoint: Endpoint) => void;
+  onRetryAllClick?: (endpoint: Endpoint, options?: { since?: string; includeUnattempted?: boolean }) => void;
   isRetrying?: boolean;
 }) {
   const successRate =
     endpoint.totalMessages > 0
       ? Math.round((endpoint.totalSuccesses / endpoint.totalMessages) * 100)
       : 100;
+  const [showRecoverPanel, setShowRecoverPanel] = useState(false);
+  const [recoverSince, setRecoverSince] = useState('');
+  const [recoverIncludeUnattempted, setRecoverIncludeUnattempted] = useState(false);
 
   return (
     <Card
@@ -193,17 +196,30 @@ function EndpointCard({
               </Button>
             )}
             {onRetryAllClick && endpoint.totalFailures > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isRetrying}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRetryAllClick(endpoint);
-                }}
-              >
-                {isRetrying ? 'Retrying...' : 'Retry All Failed'}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isRetrying}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetryAllClick(endpoint);
+                  }}
+                >
+                  {isRetrying ? 'Retrying...' : 'Retry All Failed'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isRetrying}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRecoverPanel((v) => !v);
+                  }}
+                >
+                  Recover since...
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
@@ -225,6 +241,47 @@ function EndpointCard({
             >
               Delete
             </Button>
+          </div>
+        )}
+
+        {showRecoverPanel && (
+          <div className="hkb-recover-panel" onClick={(e) => e.stopPropagation()}>
+            <label className="hkb-recover-panel-field">
+              <span>Recover messages created since</span>
+              <input
+                type="datetime-local"
+                className="hkb-input"
+                value={recoverSince}
+                onChange={(e) => setRecoverSince(e.target.value)}
+              />
+            </label>
+            <label className="hkb-recover-panel-checkbox">
+              <input
+                type="checkbox"
+                checked={recoverIncludeUnattempted}
+                onChange={(e) => setRecoverIncludeUnattempted(e.target.checked)}
+              />
+              <span>Also include messages that were never attempted</span>
+            </label>
+            <div className="hkb-recover-panel-actions">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isRetrying || !recoverSince}
+                onClick={() => {
+                  onRetryAllClick?.(endpoint, {
+                    since: new Date(recoverSince).toISOString(),
+                    includeUnattempted: recoverIncludeUnattempted,
+                  });
+                  setShowRecoverPanel(false);
+                }}
+              >
+                {isRetrying ? 'Recovering...' : 'Recover'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowRecoverPanel(false)}>
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
@@ -323,10 +380,13 @@ export function EndpointList({
     }
   };
 
-  const handleRetryAll = async (endpoint: Endpoint) => {
+  const handleRetryAll = async (
+    endpoint: Endpoint,
+    options?: { since?: string; includeUnattempted?: boolean }
+  ) => {
     setRetryingEndpointId(endpoint.id);
     try {
-      await replayFailedForEndpoint(endpoint.id);
+      await replayFailedForEndpoint(endpoint.id, options);
       refetch();
     } catch {
       // Error handled by hook

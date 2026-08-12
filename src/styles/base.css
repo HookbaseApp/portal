@@ -654,6 +654,38 @@
   gap: 0.25rem;
 }
 
+.hkb-recover-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid hsl(var(--hkb-border));
+  border-radius: var(--hkb-radius);
+  background: hsl(var(--hkb-muted));
+}
+
+.hkb-recover-panel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--hkb-foreground));
+}
+
+.hkb-recover-panel-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--hkb-muted-foreground));
+}
+
+.hkb-recover-panel-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 /* ============================================
    Endpoint Form Component
    ============================================ */

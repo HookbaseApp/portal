@@ -151,8 +151,15 @@ export class PortalApiClient {
     return this.request('POST', `/portal/messages/${id}/replay`);
   }
 
-  async replayFailedForEndpoint(endpointId: string): Promise<ApiResponse<BulkReplayResult>> {
-    return this.request('POST', `/portal/endpoints/${endpointId}/replay-failed`);
+  async replayFailedForEndpoint(
+    endpointId: string,
+    options?: { since?: string; includeUnattempted?: boolean }
+  ): Promise<ApiResponse<BulkReplayResult>> {
+    const searchParams = new URLSearchParams();
+    if (options?.since) searchParams.set('since', options.since);
+    if (options?.includeUnattempted) searchParams.set('includeUnattempted', 'true');
+    const query = searchParams.toString();
+    return this.request('POST', `/portal/endpoints/${endpointId}/replay-failed${query ? `?${query}` : ''}`);
   }
 
   // Verification

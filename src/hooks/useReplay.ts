@@ -22,12 +22,15 @@ export function useReplay() {
     }
   }, [api]);
 
-  const replayFailedForEndpoint = useCallback(async (endpointId: string) => {
+  const replayFailedForEndpoint = useCallback(async (
+    endpointId: string,
+    options?: { since?: string; includeUnattempted?: boolean }
+  ) => {
     setIsReplaying(true);
     setReplayError(null);
 
     try {
-      const result = await api.replayFailedForEndpoint(endpointId);
+      const result = await api.replayFailedForEndpoint(endpointId, options);
       return result.data;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Bulk replay failed');
