@@ -134,8 +134,13 @@ export interface Application {
 }
 
 export interface HookbaseTheme {
+  /** HSL triplets without `hsl()`, e.g. `'217 91% 60%'`. */
   colors?: {
     primary?: string;
+    /** Text on primary-coloured surfaces (buttons, switches). */
+    primaryForeground?: string;
+    /** Links and focus rings. Defaults to `primary`. */
+    accent?: string;
     background?: string;
     foreground?: string;
     muted?: string;

@@ -21,6 +21,7 @@ import type {
   BulkReplayResult,
   VerifyResult,
 } from '../types';
+import { DEFAULT_BRANDING, sanitizeBranding, type PortalBranding } from '../branding';
 
 export class PortalApiError extends Error {
   constructor(
@@ -121,6 +122,23 @@ export class PortalApiClient {
   // Application
   async getApplication(): Promise<ApiResponse<Application>> {
     return this.request('GET', '/portal/application');
+  }
+
+  // Branding
+  /**
+   * The organization's portal branding, re-validated client-side. An API without the route (404)
+   * resolves to the defaults, so an older API never breaks the portal.
+   */
+  async getBranding(): Promise<ApiResponse<PortalBranding>> {
+    try {
+      const res = await this.request<ApiResponse<unknown>>('GET', '/portal/branding');
+      return { data: sanitizeBranding(res?.data) };
+    } catch (err) {
+      if (err instanceof PortalApiError && err.status === 404) {
+        return { data: { ...DEFAULT_BRANDING, cssVariables: {} } };
+      }
+      throw err;
+    }
   }
 
   // Endpoints
