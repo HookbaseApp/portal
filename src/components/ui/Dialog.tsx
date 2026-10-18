@@ -8,6 +8,7 @@ import {
   type HTMLAttributes,
 } from 'react';
 import { cn } from '../../utils/cn';
+import { useTranslation } from '../../context/I18nContext';
 
 interface DialogContextValue {
   open: boolean;
@@ -112,6 +113,7 @@ export function DialogContent({
   ...props
 }: DialogContentProps) {
   const { open, setOpen } = useDialog();
+  const { t } = useTranslation();
 
   if (!open) return null;
 
@@ -129,7 +131,7 @@ export function DialogContent({
           type="button"
           className="hkb-dialog-close"
           onClick={() => setOpen(false)}
-          aria-label="Close"
+          aria-label={t('common.close')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

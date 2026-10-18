@@ -9,6 +9,7 @@ import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
 import type { Endpoint, TestDeliveryResult } from '../types';
 import { cn } from '../utils/cn';
+import { useTranslation, type TranslationValue } from '../context/I18nContext';
 
 export interface EndpointListProps {
   /**
@@ -51,25 +52,26 @@ function getCircuitBadgeVariant(state: Endpoint['circuitState']) {
   }
 }
 
-function formatCircuitState(state: Endpoint['circuitState']) {
+function formatCircuitState(state: Endpoint['circuitState'], t: TranslationValue['t']) {
   switch (state) {
     case 'closed':
-      return 'Healthy';
+      return t('endpoint.circuit.closed');
     case 'open':
-      return 'Circuit Open';
+      return t('endpoint.circuit.open');
     case 'half_open':
-      return 'Recovering';
+      return t('endpoint.circuit.halfOpen');
     default:
       return state;
   }
 }
 
 function TestResultInline({ result }: { result: TestDeliveryResult }) {
+  const { t } = useTranslation();
   return (
     <div className={cn('hkb-test-result', result.success ? 'hkb-test-result--success' : 'hkb-test-result--failure')}>
       <div className="hkb-test-result-header">
         <Badge variant={result.success ? 'success' : 'destructive'}>
-          {result.success ? 'Success' : 'Failed'}
+          {result.success ? t('endpoint.test.success') : t('endpoint.test.failed')}
         </Badge>
         <span className="hkb-test-result-meta">
           {result.delivery.responseStatus > 0 && `${result.delivery.responseStatus} · `}
@@ -122,6 +124,7 @@ function EndpointCard({
     endpoint.totalMessages > 0
       ? Math.round((endpoint.totalSuccesses / endpoint.totalMessages) * 100)
       : 100;
+  const { t, formatNumber } = useTranslation();
   const [showRecoverPanel, setShowRecoverPanel] = useState(false);
   const [recoverSince, setRecoverSince] = useState('');
   const [recoverIncludeUnattempted, setRecoverIncludeUnattempted] = useState(false);
@@ -140,15 +143,15 @@ function EndpointCard({
             <code className="hkb-endpoint-url">{endpoint.url}</code>
             <div className="hkb-endpoint-badges">
               {endpoint.isDisabled && (
-                <Badge variant="outline">Disabled</Badge>
+                <Badge variant="outline">{t('endpoint.disabled')}</Badge>
               )}
               <Badge variant={getCircuitBadgeVariant(endpoint.circuitState)}>
-                {formatCircuitState(endpoint.circuitState)}
+                {formatCircuitState(endpoint.circuitState, t)}
               </Badge>
               {endpoint.isVerified ? (
-                <Badge variant="success">Verified</Badge>
+                <Badge variant="success">{t('endpoint.verified')}</Badge>
               ) : (
-                <Badge variant="outline">Unverified</Badge>
+                <Badge variant="outline">{t('endpoint.unverified')}</Badge>
               )}
             </div>
           </div>
@@ -159,16 +162,16 @@ function EndpointCard({
 
           <div className="hkb-endpoint-stats">
             <span className="hkb-stat">
-              <span className="hkb-stat-value">{endpoint.totalMessages}</span>
-              <span className="hkb-stat-label">Messages</span>
+              <span className="hkb-stat-value">{formatNumber(endpoint.totalMessages)}</span>
+              <span className="hkb-stat-label">{t('endpoint.stats.messages')}</span>
             </span>
             <span className="hkb-stat">
               <span className="hkb-stat-value">{successRate}%</span>
-              <span className="hkb-stat-label">Success</span>
+              <span className="hkb-stat-label">{t('endpoint.stats.success')}</span>
             </span>
             <span className="hkb-stat">
-              <span className="hkb-stat-value">{endpoint.totalFailures}</span>
-              <span className="hkb-stat-label">Failed</span>
+              <span className="hkb-stat-value">{formatNumber(endpoint.totalFailures)}</span>
+              <span className="hkb-stat-label">{t('endpoint.stats.failed')}</span>
             </span>
           </div>
 
@@ -195,7 +198,7 @@ function EndpointCard({
                   onTestClick(endpoint);
                 }}
               >
-                {isTesting ? 'Sending...' : 'Send Test'}
+                {isTesting ? t('endpoint.sending') : t('endpoint.sendTest')}
               </Button>
             )}
             {onVerifyClick && !endpoint.isVerified && (
@@ -208,7 +211,7 @@ function EndpointCard({
                   onVerifyClick(endpoint);
                 }}
               >
-                {isVerifying ? 'Verifying...' : 'Verify'}
+                {isVerifying ? t('endpoint.verifying') : t('endpoint.verify')}
               </Button>
             )}
             {onRetryAllClick && endpoint.totalFailures > 0 && (
@@ -222,7 +225,7 @@ function EndpointCard({
                     onRetryAllClick(endpoint);
                   }}
                 >
-                  {isRetrying ? 'Retrying...' : 'Retry All Failed'}
+                  {isRetrying ? t('endpoint.retrying') : t('endpoint.retryAllFailed')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -233,7 +236,7 @@ function EndpointCard({
                     setShowRecoverPanel((v) => !v);
                   }}
                 >
-                  Recover since...
+                  {t('endpoint.recoverSince')}
                 </Button>
               </>
             )}
@@ -245,7 +248,7 @@ function EndpointCard({
                 onEditClick?.(endpoint);
               }}
             >
-              Edit
+              {t('common.edit')}
             </Button>
             <Button
               variant="ghost"
@@ -255,7 +258,7 @@ function EndpointCard({
                 onDeleteClick?.(endpoint);
               }}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         )}
@@ -263,7 +266,7 @@ function EndpointCard({
         {showRecoverPanel && (
           <div className="hkb-recover-panel" onClick={(e) => e.stopPropagation()}>
             <label className="hkb-recover-panel-field">
-              <span>Recover messages created since</span>
+              <span>{t('endpoint.recover.label')}</span>
               <input
                 type="datetime-local"
                 className="hkb-input"
@@ -277,7 +280,7 @@ function EndpointCard({
                 checked={recoverIncludeUnattempted}
                 onChange={(e) => setRecoverIncludeUnattempted(e.target.checked)}
               />
-              <span>Also include messages that were never attempted</span>
+              <span>{t('endpoint.recover.includeUnattempted')}</span>
             </label>
             <div className="hkb-recover-panel-actions">
               <Button
@@ -292,10 +295,10 @@ function EndpointCard({
                   setShowRecoverPanel(false);
                 }}
               >
-                {isRetrying ? 'Recovering...' : 'Recover'}
+                {isRetrying ? t('endpoint.recover.submitting') : t('endpoint.recover.submit')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowRecoverPanel(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -328,6 +331,7 @@ function EndpointListSkeleton() {
 }
 
 function DefaultEmptyState() {
+  const { t } = useTranslation();
   return (
     <div className="hkb-empty-state">
       <div className="hkb-empty-state-icon">
@@ -346,9 +350,9 @@ function DefaultEmptyState() {
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       </div>
-      <h3 className="hkb-empty-state-title">No endpoints yet</h3>
+      <h3 className="hkb-empty-state-title">{t('endpoint.empty.title')}</h3>
       <p className="hkb-empty-state-description">
-        Create your first webhook endpoint to start receiving events.
+        {t('endpoint.empty.description')}
       </p>
     </div>
   );
@@ -366,6 +370,7 @@ export function EndpointList({
   const { testEndpoint, clearResult } = useTestEndpoint();
   const { replayFailedForEndpoint } = useReplay();
   const { api } = useHookbase();
+  const { t } = useTranslation();
   const [testingEndpointId, setTestingEndpointId] = useState<string | null>(null);
   const [verifyingEndpointId, setVerifyingEndpointId] = useState<string | null>(null);
   const [retryingEndpointId, setRetryingEndpointId] = useState<string | null>(null);
@@ -385,7 +390,7 @@ export function EndpointList({
       const result = await testEndpoint(endpoint.id);
       setTestResults(prev => ({ ...prev, [endpoint.id]: result }));
     } catch (err) {
-      setNotice(endpoint.id, { kind: 'error', text: errorText(err, 'Test failed') });
+      setNotice(endpoint.id, { kind: 'error', text: errorText(err, t('endpoint.notice.testFailed')) });
     } finally {
       setTestingEndpointId(null);
     }
@@ -398,11 +403,11 @@ export function EndpointList({
       // A failed verification is a 200 with verified: false and the reason in error.
       const { data } = await api.verifyEndpoint(endpoint.id);
       setNotice(endpoint.id, data.verified
-        ? { kind: 'success', text: 'Endpoint verified' }
-        : { kind: 'error', text: `Verification failed: ${data.error ?? 'unknown error'}` });
+        ? { kind: 'success', text: t('endpoint.notice.verified') }
+        : { kind: 'error', text: t('endpoint.notice.verifyFailedReason', { reason: data.error ?? t('endpoint.notice.unknownError') }) });
       if (data.verified) refetch();
     } catch (err) {
-      setNotice(endpoint.id, { kind: 'error', text: errorText(err, 'Verification failed') });
+      setNotice(endpoint.id, { kind: 'error', text: errorText(err, t('endpoint.notice.verifyFailed')) });
     } finally {
       setVerifyingEndpointId(null);
     }
@@ -419,12 +424,12 @@ export function EndpointList({
       setNotice(endpoint.id, {
         kind: 'success',
         text: result.replayed === 0
-          ? 'No messages to replay'
-          : `Replaying ${result.replayed} message${result.replayed === 1 ? '' : 's'}`,
+          ? t('endpoint.notice.nothingToReplay')
+          : t(result.replayed === 1 ? 'endpoint.notice.replayingOne' : 'endpoint.notice.replayingOther', { count: result.replayed }),
       });
       refetch();
     } catch (err) {
-      setNotice(endpoint.id, { kind: 'error', text: errorText(err, 'Replay failed') });
+      setNotice(endpoint.id, { kind: 'error', text: errorText(err, t('endpoint.notice.replayFailed')) });
     } finally {
       setRetryingEndpointId(null);
     }
@@ -437,7 +442,7 @@ export function EndpointList({
   if (isError) {
     return (
       <div className="hkb-error">
-        <p>Failed to load endpoints</p>
+        <p>{t('endpoint.loadFailed')}</p>
         <p className="hkb-error-message">{error?.message}</p>
       </div>
     );

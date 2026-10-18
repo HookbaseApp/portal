@@ -7,6 +7,8 @@ import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
 import type { MessageStatus, OutboundMessage } from '../types';
 import { cn } from '../utils/cn';
+import { useTranslation, type TranslationValue } from '../context/I18nContext';
+import type { PortalMessageKey } from '../i18n';
 
 export interface MessageLogProps {
   /**
@@ -59,25 +61,19 @@ function getStatusBadgeVariant(status: MessageStatus) {
   }
 }
 
-function formatStatus(status: MessageStatus) {
-  switch (status) {
-    case 'success':
-      return 'Delivered';
-    case 'failed':
-      return 'Failed';
-    case 'awaiting_retry':
-      return 'Retrying';
-    case 'exhausted':
-      return 'Exhausted';
-    case 'dlq':
-      return 'Dead-lettered';
-    case 'pending':
-      return 'Pending';
-    case 'processing':
-      return 'Sending';
-    default:
-      return status;
-  }
+const STATUS_KEYS: Record<string, PortalMessageKey> = {
+  success: 'messages.status.success',
+  failed: 'messages.status.failed',
+  awaiting_retry: 'messages.status.awaiting_retry',
+  exhausted: 'messages.status.exhausted',
+  dlq: 'messages.status.dlq',
+  pending: 'messages.status.pending',
+  processing: 'messages.status.processing',
+};
+
+function formatStatus(status: string, t: TranslationValue['t']) {
+  const key = STATUS_KEYS[status];
+  return key ? t(key) : status;
 }
 
 /**
@@ -90,8 +86,8 @@ function canReplay(message: OutboundMessage) {
 }
 
 /** Host of the endpoint URL; the URL is null once the endpoint has been deleted. */
-function endpointLabel(url: string | null | undefined) {
-  if (!url) return 'Deleted endpoint';
+function endpointLabel(url: string | null | undefined, t: TranslationValue['t']) {
+  if (!url) return t('messages.deletedEndpoint');
   try {
     return new URL(url).hostname;
   } catch {
@@ -99,38 +95,18 @@ function endpointLabel(url: string | null | undefined) {
   }
 }
 
-function formatTimestamp(timestamp: string) {
-  const date = new Date(timestamp);
-  return date.toLocaleString();
-}
-
-function formatRelativeTime(timestamp: string) {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return 'Just now';
-}
-
 function MessageAttempts({ messageId }: { messageId: string }) {
   const { data: attempts, isLoading, isError, error } = useMessageAttempts(messageId);
+  const { t, formatDate } = useTranslation();
 
   if (isLoading) {
     return <Skeleton height={14} width={160} />;
   }
   if (isError) {
-    return <p className="hkb-error-message">{error?.message ?? 'Failed to load attempts'}</p>;
+    return <p className="hkb-error-message">{error?.message ?? t('messages.attemptsLoadFailed')}</p>;
   }
   if (!attempts || attempts.length === 0) {
-    return <p className="hkb-text-muted">No delivery attempts yet</p>;
+    return <p className="hkb-text-muted">{t('messages.noAttempts')}</p>;
   }
   return (
     <ol className="hkb-message-attempts">
@@ -138,12 +114,12 @@ function MessageAttempts({ messageId }: { messageId: string }) {
         <li key={attempt.id} className="hkb-message-attempt">
           <span className="hkb-message-attempt-number">#{attempt.attemptNumber}</span>
           <Badge variant={attempt.status === 'success' ? 'success' : attempt.status === 'failed' ? 'destructive' : 'default'}>
-            {attempt.status}
+            {formatStatus(attempt.status, t)}
           </Badge>
           {attempt.responseStatus != null && <span>HTTP {attempt.responseStatus}</span>}
           {attempt.responseTimeMs != null && <span>{attempt.responseTimeMs}ms</span>}
           {attempt.errorMessage && <span className="hkb-message-attempt-error">{attempt.errorMessage}</span>}
-          <span className="hkb-message-time-absolute">{formatTimestamp(attempt.createdAt)}</span>
+          <span className="hkb-message-time-absolute">{formatDate(attempt.createdAt)}</span>
         </li>
       ))}
     </ol>
@@ -165,6 +141,7 @@ function MessageRow({
 }) {
   const canRetry = canReplay(message);
   const [attemptsOpen, setAttemptsOpen] = useState(false);
+  const { t, formatDate, formatRelative } = useTranslation();
 
   return (
     <div
@@ -187,22 +164,22 @@ function MessageRow({
         <div className="hkb-message-header">
           <code className="hkb-message-event-type">{message.eventType}</code>
           <Badge variant={getStatusBadgeVariant(message.status)}>
-            {formatStatus(message.status)}
+            {formatStatus(message.status, t)}
           </Badge>
         </div>
         <div className="hkb-message-meta">
           <span className="hkb-message-endpoint" title={message.endpointUrl ?? undefined}>
-            {endpointLabel(message.endpointUrl)}
+            {endpointLabel(message.endpointUrl, t)}
           </span>
           <span className="hkb-message-separator">•</span>
           <span className="hkb-message-attempts">
-            {message.attempts} attempt{message.attempts !== 1 ? 's' : ''}
+            {t(message.attempts === 1 ? 'messages.attemptCountOne' : 'messages.attemptCountOther', { count: message.attempts })}
           </span>
           {message.status === 'awaiting_retry' && message.nextAttemptAt && (
             <>
               <span className="hkb-message-separator">•</span>
               <span className="hkb-message-next-attempt">
-                Next retry {formatTimestamp(message.nextAttemptAt)}
+                {t('messages.nextRetry', { date: formatDate(message.nextAttemptAt) })}
               </span>
             </>
           )}
@@ -227,7 +204,7 @@ function MessageRow({
               setAttemptsOpen((open) => !open);
             }}
           >
-            {attemptsOpen ? 'Hide attempts' : 'Attempts'}
+            {attemptsOpen ? t('messages.hideAttempts') : t('messages.attempts')}
           </Button>
         )}
         {canRetry && onRetryClick && (
@@ -240,15 +217,15 @@ function MessageRow({
               onRetryClick(message);
             }}
           >
-            {isRetrying ? 'Retrying...' : 'Retry'}
+            {isRetrying ? t('messages.retrying') : t('common.retry')}
           </Button>
         )}
         <div className="hkb-message-time">
           <span className="hkb-message-time-relative">
-            {formatRelativeTime(message.createdAt)}
+            {formatRelative(message.createdAt)}
           </span>
           <span className="hkb-message-time-absolute">
-            {formatTimestamp(message.createdAt)}
+            {formatDate(message.createdAt)}
           </span>
         </div>
       </div>
@@ -291,6 +268,7 @@ export function MessageLog({
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const [replayingMessageId, setReplayingMessageId] = useState<string | null>(null);
   const { replayMessage, replayError } = useReplay();
+  const { t } = useTranslation();
 
   // A new filter starts again from the first page.
   useEffect(() => {
@@ -329,7 +307,7 @@ export function MessageLog({
     return (
       <Card className={cn('hkb-message-log-card', className)}>
         <CardHeader>
-          <CardTitle>Delivery History</CardTitle>
+          <CardTitle>{t('messages.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <MessageLogSkeleton count={limit} />
@@ -342,14 +320,14 @@ export function MessageLog({
     return (
       <Card className={cn('hkb-message-log-card', className)}>
         <CardHeader>
-          <CardTitle>Delivery History</CardTitle>
+          <CardTitle>{t('messages.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="hkb-error">
-            <p>Failed to load messages</p>
+            <p>{t('messages.loadFailed')}</p>
             <p className="hkb-error-message">{error?.message}</p>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
+              {t('common.retry')}
             </Button>
           </div>
         </CardContent>
@@ -361,15 +339,15 @@ export function MessageLog({
     <Card className={cn('hkb-message-log-card', className)}>
       <CardHeader>
         <div className="hkb-message-log-header">
-          <CardTitle>Delivery History</CardTitle>
+          <CardTitle>{t('messages.title')}</CardTitle>
           <div className="hkb-message-log-actions">
             {refreshInterval > 0 && (
               <Badge variant="outline">
-                {isFetching ? 'Updating...' : 'Auto-refresh'}
+                {isFetching ? t('messages.updating') : t('messages.autoRefresh')}
               </Badge>
             )}
             <Button variant="ghost" size="sm" onClick={() => refetch()}>
-              Refresh
+              {t('common.refresh')}
             </Button>
           </div>
         </div>
@@ -383,7 +361,7 @@ export function MessageLog({
         )}
         {messages.length === 0 ? (
           <div className="hkb-empty-state hkb-empty-state--small">
-            <p>No messages found</p>
+            <p>{t('messages.empty')}</p>
           </div>
         ) : (
           <>
@@ -410,9 +388,9 @@ export function MessageLog({
                   onClick={() => setCursors((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev))}
                   disabled={!hasPrevious || isFetching}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
-                <span className="hkb-pagination-info">Page {page}</span>
+                <span className="hkb-pagination-info">{t('messages.page', { page })}</span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -421,7 +399,7 @@ export function MessageLog({
                   }}
                   disabled={!hasMore || !nextCursor || isFetching}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
               </div>
             )}
