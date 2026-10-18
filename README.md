@@ -2,6 +2,8 @@
 
 Embeddable React component library for managing webhook endpoints, subscriptions, and delivery history. Authenticated via portal tokens.
 
+The components call the Hookbase portal API (`/portal/*`) straight from the browser, from any origin. Only the portal token (`whpt_...`) authenticates them, so mint short-lived tokens server-side for the signed-in customer and pass them in; never ship a long-lived token in your bundle.
+
 ## Installation
 
 ```bash
@@ -108,7 +110,7 @@ Manage event subscriptions for an endpoint.
 
 ```tsx
 <SubscriptionManager
-  endpointId="wh_ep_xxx"               // Endpoint ID (required)
+  endpointId={endpoint.id}             // Endpoint ID (required)
   variant="full"                       // 'full' or 'compact'
   onChange={(subscribedIds) => {}}     // Change callback
 />
@@ -120,11 +122,25 @@ View delivery history and message status.
 
 ```tsx
 <MessageLog
-  endpointId="wh_ep_xxx"               // Filter by endpoint (optional)
-  status="failed"                      // Filter by status (optional)
-  limit={50}                           // Messages per page
+  endpointId={endpoint.id}             // Filter by endpoint (optional)
+  status="awaiting_retry"              // Filter by status (optional): pending, processing, success,
+                                       //   failed, awaiting_retry, exhausted, dlq
+  limit={50}                           // Messages per page (max 100)
   refreshInterval={30000}              // Auto-refresh in ms (0 to disable)
+  showAttempts={true}                  // Per-message "Attempts" toggle
   onMessageClick={(message) => {}}     // Click handler
+/>
+```
+
+History is paged with Previous/Next. The API pages by cursor, so there is no total count.
+
+### EndpointSecretRotation
+
+```tsx
+<EndpointSecretRotation
+  endpoint={endpoint}
+  gracePeriodSeconds={3600}            // How long the old secret keeps verifying (0-86400, default 86400)
+  onSuccess={(secret, { secretVersion, previousSecretExpiresAt }) => {}}
 />
 ```
 
@@ -179,7 +195,8 @@ function MyComponent() {
   const { endpoints, isLoading, createEndpoint } = useEndpoints();
   const { eventTypes, groupedByCategory } = useEventTypes();
   const { subscriptions, toggleSubscription } = useSubscriptions(endpointId);
-  const { messages, total } = useMessages({ limit: 25 });
+  const { messages, hasMore, nextCursor } = useMessages({ limit: 25 });
+  // Next page: useMessages({ limit: 25, cursor: nextCursor })
 
   // ...
 }
@@ -198,8 +215,18 @@ function MyComponent() {
   // Or create a standalone client
   const client = new PortalApiClient('https://api.hookbase.app', token);
   const endpoints = await client.getEndpoints();
+
+  // Delivery history is cursor-paged: pass nextCursor back verbatim
+  let cursor: string | undefined;
+  do {
+    const page = await client.getMessages({ limit: 100, cursor });
+    // ... page.data
+    cursor = page.pagination.nextCursor ?? undefined;
+  } while (cursor);
 }
 ```
+
+Failed calls throw `PortalApiError` with `status`, a `message` taken from the API's error body, and `details` (field errors) for invalid input.
 
 ## TypeScript
 

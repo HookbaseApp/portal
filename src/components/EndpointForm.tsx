@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from './ui/Dialog';
-import type { Endpoint, EndpointWithSecret } from '../types';
+import type { Endpoint, EndpointDetail, RotateSecretResult } from '../types';
 import { cn } from '../utils/cn';
 
 export interface EndpointFormProps {
@@ -25,10 +25,10 @@ export interface EndpointFormProps {
    */
   endpoint?: Endpoint;
   /**
-   * Callback when form submission succeeds
+   * Callback when form submission succeeds, with the saved endpoint.
    * For create mode, also receives the signing secret
    */
-  onSuccess?: (endpoint: Endpoint, secret?: string) => void;
+  onSuccess?: (endpoint: EndpointDetail, secret?: string) => void;
   /**
    * Callback when form is cancelled
    */
@@ -73,7 +73,8 @@ export function EndpointForm({
       if (isEdit && endpoint) {
         const result = await updateEndpoint(endpoint.id, {
           url,
-          description: description || undefined,
+          // null clears it; undefined would leave the old description in place
+          description: description.trim() ? description : null,
         });
         onSuccess?.(result.data);
       } else {
@@ -181,25 +182,36 @@ export function EndpointForm({
 
 export interface EndpointSecretRotationProps {
   endpoint: Endpoint;
-  onSuccess?: (newSecret: string) => void;
+  /**
+   * How long the old secret keeps verifying, in seconds (0-86400)
+   * @default 86400 (the API's default)
+   */
+  gracePeriodSeconds?: number;
+  onSuccess?: (newSecret: string, result: RotateSecretResult) => void;
   onCancel?: () => void;
 }
 
 export function EndpointSecretRotation({
   endpoint,
+  gracePeriodSeconds,
   onSuccess,
   onCancel,
 }: EndpointSecretRotationProps) {
   const { rotateSecret, isRotating } = useEndpoints();
   const [newSecret, setNewSecret] = useState<string | null>(null);
+  const [previousSecretExpiresAt, setPreviousSecretExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleRotate = async () => {
     setError(null);
     try {
-      const result = await rotateSecret(endpoint.id);
+      const result = await rotateSecret(
+        endpoint.id,
+        gracePeriodSeconds !== undefined ? { gracePeriodSeconds } : undefined
+      );
       setNewSecret(result.data.secret);
-      onSuccess?.(result.data.secret);
+      setPreviousSecretExpiresAt(result.data.previousSecretExpiresAt);
+      onSuccess?.(result.data.secret, result.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to rotate secret');
     }
@@ -214,6 +226,9 @@ export function EndpointSecretRotation({
             <DialogDescription>
               Your endpoint now has a new signing secret. Update your application
               with this new secret.
+              {previousSecretExpiresAt &&
+                new Date(previousSecretExpiresAt).getTime() > Date.now() &&
+                ` The old secret keeps working until ${new Date(previousSecretExpiresAt).toLocaleString()}.`}
             </DialogDescription>
           </DialogHeader>
 

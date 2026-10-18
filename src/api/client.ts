@@ -1,13 +1,18 @@
 import type {
   Application,
   Endpoint,
+  EndpointDetail,
   EndpointWithSecret,
   EventType,
   Subscription,
   OutboundMessage,
+  OutboundMessageDetail,
+  MessageAttempt,
   CreateEndpointInput,
   UpdateEndpointInput,
   CreateSubscriptionInput,
+  RotateSecretInput,
+  RotateSecretResult,
   MessagesQuery,
   PaginatedResponse,
   ApiResponse,
@@ -21,18 +26,53 @@ export class PortalApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code?: string
+    public code?: string,
+    /** Validation detail for 400s: zod's flatten() output (`{ formErrors, fieldErrors }`). */
+    public details?: unknown,
+    /** The parsed error body, when there was one. */
+    public body?: unknown
   ) {
     super(message);
     this.name = 'PortalApiError';
   }
 }
 
+/**
+ * The message for an error body. The API answers `{ error: string }`, sometimes with a longer
+ * `message` (e.g. why a replay was refused) and, for invalid input, zod's flattened `details`.
+ */
+function errorMessageFrom(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const b = body as Record<string, unknown>;
+  let message: string | undefined;
+  if (typeof b.message === 'string' && b.message) message = b.message;
+  else if (typeof b.error === 'string' && b.error) message = b.error;
+  else if (b.error && typeof b.error === 'object' && typeof (b.error as { message?: unknown }).message === 'string') {
+    message = (b.error as { message: string }).message;
+  }
+  if (!message) return fallback;
+
+  const fieldErrors = (b.details as { fieldErrors?: Record<string, unknown> } | undefined)?.fieldErrors;
+  if (fieldErrors && typeof fieldErrors === 'object') {
+    const parts = Object.entries(fieldErrors)
+      .filter(([, errs]) => Array.isArray(errs) && errs.length > 0)
+      .map(([field, errs]) => `${field}: ${(errs as string[]).join(', ')}`);
+    if (parts.length > 0) message = `${message} (${parts.join('; ')})`;
+  }
+  return message;
+}
+
+const seg = (id: string) => encodeURIComponent(id);
+
 export class PortalApiClient {
+  private baseUrl: string;
+
   constructor(
-    private baseUrl: string,
+    baseUrl: string,
     private token: string
-  ) {}
+  ) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+  }
 
   private async request<T>(
     method: string,
@@ -55,18 +95,20 @@ export class PortalApiClient {
     });
 
     if (!res.ok) {
-      let errorMessage = `API error: ${res.status}`;
-      let errorCode: string | undefined;
-
+      let errorBody: unknown;
       try {
-        const errorData = await res.json();
-        errorMessage = errorData.error?.message || errorData.message || errorMessage;
-        errorCode = errorData.error?.code || errorData.code;
+        errorBody = await res.json();
       } catch {
-        // Ignore JSON parse errors
+        // Not JSON (e.g. an edge error page)
       }
-
-      throw new PortalApiError(errorMessage, res.status, errorCode);
+      const b = (errorBody && typeof errorBody === 'object' ? errorBody : {}) as Record<string, unknown>;
+      throw new PortalApiError(
+        errorMessageFrom(errorBody, `API error: ${res.status}`),
+        res.status,
+        typeof b.code === 'string' ? b.code : undefined,
+        b.details,
+        errorBody
+      );
     }
 
     if (res.status === 204) {
@@ -86,24 +128,27 @@ export class PortalApiClient {
     return this.request('GET', '/portal/endpoints');
   }
 
-  async getEndpoint(id: string): Promise<ApiResponse<Endpoint>> {
-    return this.request('GET', `/portal/endpoints/${id}`);
+  async getEndpoint(id: string): Promise<ApiResponse<EndpointDetail>> {
+    return this.request('GET', `/portal/endpoints/${seg(id)}`);
   }
 
   async createEndpoint(data: CreateEndpointInput): Promise<ApiResponse<EndpointWithSecret>> {
     return this.request('POST', '/portal/endpoints', data);
   }
 
-  async updateEndpoint(id: string, data: UpdateEndpointInput): Promise<ApiResponse<Endpoint>> {
-    return this.request('PATCH', `/portal/endpoints/${id}`, data);
+  async updateEndpoint(id: string, data: UpdateEndpointInput): Promise<ApiResponse<EndpointDetail>> {
+    return this.request('PATCH', `/portal/endpoints/${seg(id)}`, data);
   }
 
   async deleteEndpoint(id: string): Promise<void> {
-    return this.request('DELETE', `/portal/endpoints/${id}`);
+    await this.request('DELETE', `/portal/endpoints/${seg(id)}`);
   }
 
-  async rotateEndpointSecret(id: string): Promise<ApiResponse<{ secret: string }>> {
-    return this.request('POST', `/portal/endpoints/${id}/rotate-secret`);
+  async rotateEndpointSecret(id: string, options?: RotateSecretInput): Promise<ApiResponse<RotateSecretResult>> {
+    const body = options?.gracePeriodSeconds !== undefined
+      ? { gracePeriodSeconds: options.gracePeriodSeconds }
+      : undefined;
+    return this.request('POST', `/portal/endpoints/${seg(id)}/rotate-secret`, body);
   }
 
   // Event Types
@@ -113,8 +158,10 @@ export class PortalApiClient {
 
   // Subscriptions
   async getSubscriptions(endpointId?: string): Promise<ApiResponse<Subscription[]>> {
-    const query = endpointId ? `?endpointId=${endpointId}` : '';
-    return this.request('GET', `/portal/subscriptions${query}`);
+    const query = endpointId ? `?endpointId=${encodeURIComponent(endpointId)}` : '';
+    const res = await this.request<ApiResponse<Subscription[]>>('GET', `/portal/subscriptions${query}`);
+    // API versions before the endpointId filter returned every endpoint's subscriptions.
+    return endpointId ? { ...res, data: res.data.filter((s) => s.endpointId === endpointId) } : res;
   }
 
   async createSubscription(data: CreateSubscriptionInput): Promise<ApiResponse<Subscription>> {
@@ -122,33 +169,41 @@ export class PortalApiClient {
   }
 
   async deleteSubscription(id: string): Promise<void> {
-    return this.request('DELETE', `/portal/subscriptions/${id}`);
+    await this.request('DELETE', `/portal/subscriptions/${seg(id)}`);
   }
 
   // Messages
+  /**
+   * One page of delivery history, newest first. Pass `pagination.nextCursor` back as `cursor` for
+   * the next page while `pagination.hasMore` is true.
+   */
   async getMessages(params?: MessagesQuery): Promise<PaginatedResponse<OutboundMessage>> {
     const searchParams = new URLSearchParams();
     if (params?.endpointId) searchParams.set('endpointId', params.endpointId);
     if (params?.status) searchParams.set('status', params.status);
     if (params?.limit) searchParams.set('limit', params.limit.toString());
-    if (params?.offset) searchParams.set('offset', params.offset.toString());
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
 
     const query = searchParams.toString();
     return this.request('GET', `/portal/messages${query ? `?${query}` : ''}`);
   }
 
-  async getMessage(id: string): Promise<ApiResponse<OutboundMessage>> {
-    return this.request('GET', `/portal/messages/${id}`);
+  async getMessage(id: string): Promise<ApiResponse<OutboundMessageDetail>> {
+    return this.request('GET', `/portal/messages/${seg(id)}`);
+  }
+
+  async getMessageAttempts(id: string): Promise<ApiResponse<MessageAttempt[]>> {
+    return this.request('GET', `/portal/messages/${seg(id)}/attempts`);
   }
 
   // Test Events
   async testEndpoint(id: string, eventType?: string): Promise<TestDeliveryResult> {
-    return this.request('POST', `/portal/endpoints/${id}/test`, eventType ? { eventType } : {});
+    return this.request('POST', `/portal/endpoints/${seg(id)}/test`, eventType ? { eventType } : {});
   }
 
   // Replay
   async replayMessage(id: string): Promise<ApiResponse<ReplayResult>> {
-    return this.request('POST', `/portal/messages/${id}/replay`);
+    return this.request('POST', `/portal/messages/${seg(id)}/replay`);
   }
 
   async replayFailedForEndpoint(
@@ -159,11 +214,15 @@ export class PortalApiClient {
     if (options?.since) searchParams.set('since', options.since);
     if (options?.includeUnattempted) searchParams.set('includeUnattempted', 'true');
     const query = searchParams.toString();
-    return this.request('POST', `/portal/endpoints/${endpointId}/replay-failed${query ? `?${query}` : ''}`);
+    return this.request('POST', `/portal/endpoints/${seg(endpointId)}/replay-failed${query ? `?${query}` : ''}`);
   }
 
   // Verification
+  /**
+   * Sends the endpoint a challenge. A failed verification is still a 200: check `data.verified`
+   * and `data.error`.
+   */
   async verifyEndpoint(id: string): Promise<ApiResponse<VerifyResult>> {
-    return this.request('POST', `/portal/endpoints/${id}/verify`);
+    return this.request('POST', `/portal/endpoints/${seg(id)}/verify`);
   }
 }

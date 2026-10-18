@@ -19,21 +19,12 @@ function createWrapper() {
   );
 }
 
-// Default application response consumed by HookbasePortal on mount
-const mockApplicationResponse = {
-  ok: true,
-  status: 200,
-  json: () => Promise.resolve({ data: { id: 'app_1', name: 'Test App', organizationId: 'org_1' } }),
-};
-
-// TODO: Fix context setup - HookbasePortal creates its own QueryClient
-// and fetches /portal/application on mount, making mock ordering fragile.
-describe.skip('Portal Hooks', () => {
+// HookbasePortal makes no request of its own on mount, so each test's queued responses are
+// consumed by the hook under test, in order. (These were skipped on the belief that it fetched
+// /portal/application first; that prepended mock is what shifted every response by one.)
+describe('Portal Hooks', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // HookbasePortal always fetches /portal/application on mount,
-    // so prepend that mock before each test's specific mocks
-    mockFetch.mockResolvedValueOnce(mockApplicationResponse);
+    mockFetch.mockReset();
   });
 
   describe('useEndpoints', () => {
@@ -97,8 +88,9 @@ describe.skip('Portal Hooks', () => {
     it('should handle errors', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
-        status: 500,
-        json: () => Promise.resolve({ error: { message: 'Server error' } }),
+        // A 4xx: the portal's QueryClient doesn't retry those (a 5xx is retried twice)
+        status: 401,
+        json: () => Promise.resolve({ error: 'Token expired' }),
       });
 
       const { result } = renderHook(() => useEndpoints(), {
@@ -109,7 +101,7 @@ describe.skip('Portal Hooks', () => {
         expect(result.current.isError).toBe(true);
       });
 
-      expect(result.current.error).toBeDefined();
+      expect(result.current.error?.message).toBe('Token expired');
     });
   });
 
@@ -214,9 +206,7 @@ describe.skip('Portal Hooks', () => {
     it('should fetch messages with pagination', async () => {
       const mockMessages = {
         data: [{ id: 'msg_1', eventType: 'order.created' }],
-        total: 50,
-        limit: 25,
-        offset: 0,
+        pagination: { hasMore: true, nextCursor: 'k1.next' },
       };
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -233,7 +223,9 @@ describe.skip('Portal Hooks', () => {
       });
 
       expect(result.current.messages).toHaveLength(1);
-      expect(result.current.total).toBe(50);
+      expect(result.current.hasMore).toBe(true);
+      expect(result.current.nextCursor).toBe('k1.next');
+      expect(mockFetch.mock.calls[0][0]).toBe('https://api.test.com/portal/messages?limit=25');
     });
 
     it('should support auto-refresh', async () => {
@@ -243,9 +235,7 @@ describe.skip('Portal Hooks', () => {
         json: () =>
           Promise.resolve({
             data: [],
-            total: 0,
-            limit: 25,
-            offset: 0,
+            pagination: { hasMore: false, nextCursor: null },
           }),
       });
 
