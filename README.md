@@ -55,10 +55,13 @@ Main provider component that wraps all portal components.
 <HookbasePortal
   token="whpt_xxx"              // Portal token (required)
   apiUrl="https://api.hookbase.app"  // API URL (optional)
-  theme={{                      // Theme customization (optional)
-    colors: { primary: '217 91% 60%' },
+  theme={{                      // Theme customization (optional): a HookbaseTheme
+    colors: { primary: '217 91% 60%' },  // or a PortalBranding object (see Branding)
     darkMode: 'auto',
   }}
+  useServerBranding             // Apply the org's branding from GET /portal/branding (optional, default false)
+  locale="es"                   // UI locale (optional; see Localization)
+  messages={{ 'common.cancel': 'Back' }}  // Override any UI string (optional)
   onError={(error) => {}}       // Error callback (optional)
 >
   {children}
@@ -178,6 +181,82 @@ Or override CSS variables directly:
 }
 ```
 
+## Branding
+
+Organizations configure portal branding in the Hookbase dashboard (Settings → Portal branding;
+Starter plan and above): logo, primary and accent colours, light/dark/auto theme, display name,
+support URL/email, default locale, and a fixed set of colour variables. The portal token API
+serves it at `GET /portal/branding`:
+
+```ts
+interface PortalBranding {
+  branded: boolean;              // false: default Hookbase styling (no config, or the plan no longer includes branding)
+  displayName: string | null;
+  logoUrl: string | null;        // https only
+  primaryColor: string | null;   // '#rgb' | '#rrggbb'
+  accentColor: string | null;    // links and focus rings
+  theme: 'light' | 'dark' | 'auto';
+  supportUrl: string | null;     // https only
+  supportEmail: string | null;
+  locale: PortalLocale | null;   // organization default locale
+  cssVariables: {                // '#rgb' | '#rrggbb', radius as px/rem
+    background?: string; foreground?: string; muted?: string; mutedForeground?: string;
+    border?: string; destructive?: string; success?: string; warning?: string; radius?: string;
+  };
+  showPoweredBy: boolean;
+  customDomain: string | null;   // the org's active custom portal hostname
+}
+```
+
+Use it in one of two ways:
+
+```tsx
+// 1. Let the portal fetch and apply it.
+<HookbasePortal token={token} useServerBranding>
+  <PortalBrandHeader fallbackTitle="Webhooks" />   {/* logo + display name + support link */}
+  <EndpointList />
+  <PoweredBy />                                    {/* "Powered by Hookbase" unless branding turns it off */}
+</HookbasePortal>
+
+// 2. Pass a branding object you already have (e.g. fetched server-side) as `theme`.
+<HookbasePortal token={token} theme={branding}>...</HookbasePortal>
+```
+
+With `useServerBranding`, an explicit `theme` still wins field by field, so you can pin individual
+colours. An API that predates `/portal/branding` answers 404, which the portal treats as "no
+branding". `useBranding()` returns `{ branding, isLoading }` for rendering your own header.
+
+Branding values are re-validated in the browser (strict hex colours, px/rem radius, https-only
+URLs; anything else is dropped) and are only applied as CSS custom properties on the portal
+wrapper — never as injected CSS. `brandingToTheme(branding)` exposes the mapping onto
+`HookbaseTheme` if you want to merge it yourself.
+
+## Localization
+
+The components ship with catalogs for `en`, `es`, `fr`, `de`, `ja` and `pt-BR`
+(`SUPPORTED_LOCALES`). The locale is chosen in this order:
+
+1. the `locale` prop
+2. `?locale=` in the page URL
+3. the organization's default locale (with `useServerBranding` or a branding `theme`)
+4. the browser's languages (`navigator.languages`)
+5. English
+
+Tags are matched exactly, then by language: `es-MX` → `es`, `fr-CA` → `fr`, `pt`/`pt-PT` →
+`pt-BR`; anything unsupported moves on to the next source. Dates, numbers and relative times are
+formatted with `Intl` in the chosen locale.
+
+Override individual strings with `messages` (keys are the English catalog's, e.g.
+`'endpoint.empty.title'`); any key you leave out falls back to the locale's catalog, then English:
+
+```tsx
+<HookbasePortal token={token} locale="de" messages={{ 'brand.defaultTitle': 'Webhooks' }}>
+```
+
+`useTranslation()` returns `{ t, locale, formatDate, formatNumber, formatRelative }` for your own
+components inside the portal; `resolveLocale([...candidates])` and `createTranslator(locale,
+overrides)` are exported for use outside React.
+
 ## Hooks
 
 Access data directly using React Query-powered hooks:
@@ -239,6 +318,9 @@ import type {
   Subscription,
   OutboundMessage,
   HookbaseTheme,
+  PortalBranding,
+  PortalLocale,
+  PortalMessages,
 } from '@hookbase/portal';
 ```
 
