@@ -83,8 +83,15 @@ function TestResultInline({ result }: { result: TestDeliveryResult }) {
   );
 }
 
+/** The outcome of the last verify / test / replay action on an endpoint, shown on its card. */
+interface EndpointNotice {
+  kind: 'success' | 'error';
+  text: string;
+}
+
 function EndpointCard({
   endpoint,
+  notice,
   showActions,
   onEndpointClick,
   onEditClick,
@@ -98,6 +105,7 @@ function EndpointCard({
   isRetrying,
 }: {
   endpoint: Endpoint;
+  notice?: EndpointNotice | null;
   showActions: boolean;
   onEndpointClick?: (endpoint: Endpoint) => void;
   onEditClick?: (endpoint: Endpoint) => void;
@@ -165,6 +173,14 @@ function EndpointCard({
           </div>
 
           {testResult && <TestResultInline result={testResult} />}
+          {notice && (
+            <p
+              className={notice.kind === 'error' ? 'hkb-form-error' : 'hkb-text-muted'}
+              role={notice.kind === 'error' ? 'alert' : 'status'}
+            >
+              {notice.text}
+            </p>
+          )}
         </div>
 
         {showActions && (
@@ -347,22 +363,29 @@ export function EndpointList({
   className,
 }: EndpointListProps) {
   const { endpoints, isLoading, isError, error, refetch } = useEndpoints();
-  const { testEndpoint, isTesting, testResult, clearResult } = useTestEndpoint();
-  const { replayFailedForEndpoint, isReplaying } = useReplay();
+  const { testEndpoint, clearResult } = useTestEndpoint();
+  const { replayFailedForEndpoint } = useReplay();
   const { api } = useHookbase();
   const [testingEndpointId, setTestingEndpointId] = useState<string | null>(null);
   const [verifyingEndpointId, setVerifyingEndpointId] = useState<string | null>(null);
   const [retryingEndpointId, setRetryingEndpointId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestDeliveryResult>>({});
+  const [notices, setNotices] = useState<Record<string, EndpointNotice | null>>({});
+
+  const setNotice = (endpointId: string, notice: EndpointNotice | null) =>
+    setNotices((prev) => ({ ...prev, [endpointId]: notice }));
+  const errorText = (err: unknown, fallback: string) =>
+    err instanceof Error && err.message ? err.message : fallback;
 
   const handleTest = async (endpoint: Endpoint) => {
     setTestingEndpointId(endpoint.id);
+    setNotice(endpoint.id, null);
     clearResult();
     try {
       const result = await testEndpoint(endpoint.id);
       setTestResults(prev => ({ ...prev, [endpoint.id]: result }));
-    } catch {
-      // Error handled by hook
+    } catch (err) {
+      setNotice(endpoint.id, { kind: 'error', text: errorText(err, 'Test failed') });
     } finally {
       setTestingEndpointId(null);
     }
@@ -370,11 +393,16 @@ export function EndpointList({
 
   const handleVerify = async (endpoint: Endpoint) => {
     setVerifyingEndpointId(endpoint.id);
+    setNotice(endpoint.id, null);
     try {
-      await api.verifyEndpoint(endpoint.id);
-      refetch();
-    } catch {
-      // Silently fail
+      // A failed verification is a 200 with verified: false and the reason in error.
+      const { data } = await api.verifyEndpoint(endpoint.id);
+      setNotice(endpoint.id, data.verified
+        ? { kind: 'success', text: 'Endpoint verified' }
+        : { kind: 'error', text: `Verification failed: ${data.error ?? 'unknown error'}` });
+      if (data.verified) refetch();
+    } catch (err) {
+      setNotice(endpoint.id, { kind: 'error', text: errorText(err, 'Verification failed') });
     } finally {
       setVerifyingEndpointId(null);
     }
@@ -385,11 +413,18 @@ export function EndpointList({
     options?: { since?: string; includeUnattempted?: boolean }
   ) => {
     setRetryingEndpointId(endpoint.id);
+    setNotice(endpoint.id, null);
     try {
-      await replayFailedForEndpoint(endpoint.id, options);
+      const result = await replayFailedForEndpoint(endpoint.id, options);
+      setNotice(endpoint.id, {
+        kind: 'success',
+        text: result.replayed === 0
+          ? 'No messages to replay'
+          : `Replaying ${result.replayed} message${result.replayed === 1 ? '' : 's'}`,
+      });
       refetch();
-    } catch {
-      // Error handled by hook
+    } catch (err) {
+      setNotice(endpoint.id, { kind: 'error', text: errorText(err, 'Replay failed') });
     } finally {
       setRetryingEndpointId(null);
     }
@@ -418,6 +453,7 @@ export function EndpointList({
         <EndpointCard
           key={endpoint.id}
           endpoint={endpoint}
+          notice={notices[endpoint.id] ?? null}
           showActions={showActions}
           onEndpointClick={onEndpointClick}
           onEditClick={onEditClick}

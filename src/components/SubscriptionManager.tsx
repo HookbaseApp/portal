@@ -8,6 +8,7 @@ import { Input } from './ui/Input';
 import { Skeleton } from './ui/Skeleton';
 import type { EventType } from '../types';
 import { cn } from '../utils/cn';
+import { formatJson } from '../utils/formatJson';
 
 export interface SubscriptionManagerProps {
   /**
@@ -40,14 +41,7 @@ function SubscriptionRow({
   isToggling: boolean;
   onToggle: () => void;
 }) {
-  let examplePreview: string | null = null;
-  if (eventType.examplePayload) {
-    try {
-      examplePreview = JSON.stringify(JSON.parse(eventType.examplePayload), null, 2);
-    } catch {
-      examplePreview = eventType.examplePayload;
-    }
-  }
+  const examplePreview = formatJson(eventType.examplePayload);
 
   return (
     <div className="hkb-subscription-row" title={examplePreview ? `Example:\n${examplePreview}` : undefined}>

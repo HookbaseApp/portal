@@ -976,6 +976,44 @@
   font-size: 0.75rem;
 }
 
+.hkb-message-error {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: hsl(var(--hkb-destructive));
+  overflow-wrap: anywhere;
+}
+
+.hkb-message-attempts-panel {
+  margin-top: 0.5rem;
+}
+
+.hkb-message-attempts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.hkb-message-attempt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--hkb-muted-foreground));
+}
+
+.hkb-message-attempt-number {
+  font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.hkb-message-attempt-error {
+  color: hsl(var(--hkb-destructive));
+  overflow-wrap: anywhere;
+}
+
 .hkb-message-pagination {
   display: flex;
   align-items: center;

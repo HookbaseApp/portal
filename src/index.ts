@@ -11,7 +11,7 @@ export { useTheme } from './context/ThemeContext';
 export { useEndpoints, useEndpoint } from './hooks/useEndpoints';
 export { useEventTypes } from './hooks/useEventTypes';
 export { useSubscriptions } from './hooks/useSubscriptions';
-export { useMessages, useMessage, type UseMessagesOptions } from './hooks/useMessages';
+export { useMessages, useMessage, useMessageAttempts, type UseMessagesOptions } from './hooks/useMessages';
 export { useApplication } from './hooks/useApplication';
 export { useTestEndpoint } from './hooks/useTestEndpoint';
 export { useReplay } from './hooks/useReplay';
@@ -77,16 +77,26 @@ export {
 // Types
 export type {
   Endpoint,
+  EndpointDetail,
   EndpointWithSecret,
+  CircuitState,
+  SuccessStatusCode,
+  BackoffType,
   EventType,
   Subscription,
   OutboundMessage,
+  OutboundMessageDetail,
+  MessageStatus,
+  MessageAttempt,
   Application,
   HookbaseTheme,
   CreateEndpointInput,
   UpdateEndpointInput,
   CreateSubscriptionInput,
+  RotateSecretInput,
+  RotateSecretResult,
   MessagesQuery,
+  Pagination,
   PaginatedResponse,
   ApiResponse,
   TestDeliveryResult,

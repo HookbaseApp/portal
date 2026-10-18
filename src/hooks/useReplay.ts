@@ -1,8 +1,12 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useHookbase } from './useHookbase';
+
+const MESSAGES_KEY = ['portal', 'messages'] as const;
 
 export function useReplay() {
   const { api } = useHookbase();
+  const queryClient = useQueryClient();
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayError, setReplayError] = useState<Error | null>(null);
 
@@ -12,6 +16,8 @@ export function useReplay() {
 
     try {
       const result = await api.replayMessage(messageId);
+      // The replay is a new message at the top of the history
+      queryClient.invalidateQueries({ queryKey: MESSAGES_KEY });
       return result.data;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Replay failed');
@@ -20,7 +26,7 @@ export function useReplay() {
     } finally {
       setIsReplaying(false);
     }
-  }, [api]);
+  }, [api, queryClient]);
 
   const replayFailedForEndpoint = useCallback(async (
     endpointId: string,
@@ -31,6 +37,8 @@ export function useReplay() {
 
     try {
       const result = await api.replayFailedForEndpoint(endpointId, options);
+      // The replay is a new message at the top of the history
+      queryClient.invalidateQueries({ queryKey: MESSAGES_KEY });
       return result.data;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Bulk replay failed');
@@ -39,7 +47,7 @@ export function useReplay() {
     } finally {
       setIsReplaying(false);
     }
-  }, [api]);
+  }, [api, queryClient]);
 
   return {
     replayMessage,

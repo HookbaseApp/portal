@@ -6,6 +6,7 @@ import { Badge } from './ui/Badge';
 import { Skeleton } from './ui/Skeleton';
 import type { EventType } from '../types';
 import { cn } from '../utils/cn';
+import { formatJson } from '../utils/formatJson';
 
 export interface EventTypeListProps {
   /**
@@ -38,7 +39,7 @@ function EventTypeCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const hasExtra = eventType.examplePayload || eventType.documentationUrl;
+  const hasExtra = eventType.examplePayload != null || !!eventType.documentationUrl;
 
   const handleToggle = (e: React.MouseEvent) => {
     if (hasExtra) {
@@ -47,14 +48,7 @@ function EventTypeCard({
     }
   };
 
-  let parsedExample: string | null = null;
-  if (eventType.examplePayload) {
-    try {
-      parsedExample = JSON.stringify(JSON.parse(eventType.examplePayload), null, 2);
-    } catch {
-      parsedExample = eventType.examplePayload;
-    }
-  }
+  const parsedExample = formatJson(eventType.examplePayload);
 
   return (
     <div

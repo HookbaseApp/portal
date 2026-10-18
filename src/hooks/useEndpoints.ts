@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useHookbase } from '../context/HookbaseContext';
-import type { CreateEndpointInput, UpdateEndpointInput, Endpoint, EndpointWithSecret } from '../types';
+import type { CreateEndpointInput, UpdateEndpointInput, RotateSecretInput } from '../types';
 
 const ENDPOINTS_KEY = ['portal', 'endpoints'] as const;
 
@@ -39,7 +39,12 @@ export function useEndpoints() {
   });
 
   const rotateSecretMutation = useMutation({
-    mutationFn: (id: string) => api.rotateEndpointSecret(id),
+    mutationFn: ({ id, options }: { id: string; options?: RotateSecretInput }) =>
+      api.rotateEndpointSecret(id, options),
+    onSuccess: () => {
+      // secretVersion and previousSecretExpiresAt changed
+      queryClient.invalidateQueries({ queryKey: ENDPOINTS_KEY });
+    },
   });
 
   return {
@@ -62,7 +67,8 @@ export function useEndpoints() {
     isDeleting: deleteMutation.isPending,
     deleteError: deleteMutation.error,
 
-    rotateSecret: rotateSecretMutation.mutateAsync,
+    rotateSecret: (id: string, options?: RotateSecretInput) =>
+      rotateSecretMutation.mutateAsync({ id, options }),
     isRotating: rotateSecretMutation.isPending,
   };
 }
