@@ -18,6 +18,8 @@
   --hkb-destructive: 0 84% 60%;
   --hkb-destructive-foreground: 0 0% 100%;
   --hkb-radius: 0.5rem;
+  /* Links; brand accent colour. Follows primary unless a theme/branding sets it. */
+  --hkb-accent: var(--hkb-primary);
 
   /* Typography */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
@@ -120,7 +122,7 @@
 
 .hkb-button--link {
   background-color: transparent;
-  color: hsl(var(--hkb-primary));
+  color: hsl(var(--hkb-accent));
   text-decoration: underline;
 }
 
@@ -1055,4 +1057,58 @@
 
 .hkb-mb-4 {
   margin-bottom: 1rem;
+}
+
+/* Branding: header and footer */
+.hkb-brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+}
+
+.hkb-brand-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.hkb-brand-logo {
+  max-height: 2rem;
+  max-width: 10rem;
+  object-fit: contain;
+}
+
+.hkb-brand-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hkb-brand-support,
+.hkb-powered-by a {
+  color: hsl(var(--hkb-accent));
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.hkb-brand-support:hover,
+.hkb-powered-by a:hover {
+  text-decoration: underline;
+}
+
+.hkb-powered-by {
+  padding: 1rem 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: hsl(var(--hkb-muted-foreground));
+}
+
+.hkb-powered-by a {
+  font-size: inherit;
 }

@@ -1,11 +1,43 @@
 // Main exports for @hookbase/portal
 
 // Provider and main wrapper
-export { HookbasePortal, type HookbasePortalProps } from './context/HookbaseContext';
+export {
+  HookbasePortal,
+  useBranding,
+  type HookbasePortalProps,
+  type BrandingContextValue,
+} from './context/HookbaseContext';
 
 // Context hooks
 export { useHookbase } from './hooks/useHookbase';
 export { useTheme } from './context/ThemeContext';
+export { useTranslation, type TranslationValue } from './context/I18nContext';
+
+// Branding
+export {
+  DEFAULT_BRANDING,
+  brandingToTheme,
+  sanitizeBranding,
+  isPortalBranding,
+  hexToHslTriplet,
+  type PortalBranding,
+  type BrandingCssVariables,
+  type BrandingCssVariable,
+} from './branding';
+
+// i18n
+export {
+  SUPPORTED_LOCALES,
+  DEFAULT_LOCALE,
+  CATALOGS,
+  resolveLocale,
+  matchLocale,
+  createTranslator,
+  type PortalLocale,
+  type PortalMessages,
+  type PortalMessageKey,
+  type Translate,
+} from './i18n';
 
 // Data hooks
 export { useEndpoints, useEndpoint } from './hooks/useEndpoints';
@@ -39,6 +71,12 @@ export {
   MessageLog,
   type MessageLogProps,
 } from './components/MessageLog';
+export {
+  PortalBrandHeader,
+  PoweredBy,
+  type PortalBrandHeaderProps,
+  type PoweredByProps,
+} from './components/Branding';
 
 // UI Primitives (for advanced customization)
 export {

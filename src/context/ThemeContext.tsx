@@ -65,6 +65,13 @@ function buildCssVariables(
   if (theme.colors?.primary) {
     vars['--hkb-primary'] = theme.colors.primary;
   }
+  if (theme.colors?.primaryForeground) {
+    vars['--hkb-primary-foreground'] = theme.colors.primaryForeground;
+  }
+  if (theme.colors?.accent) {
+    vars['--hkb-accent'] = theme.colors.accent;
+    vars['--hkb-ring'] = theme.colors.accent;
+  }
   if (theme.colors?.background) {
     vars['--hkb-background'] = theme.colors.background;
   }

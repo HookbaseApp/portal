@@ -12,3 +12,9 @@ export { MessageLog, type MessageLogProps } from './MessageLog';
 
 // Re-export UI primitives for advanced customization
 export * from './ui';
+export {
+  PortalBrandHeader,
+  PoweredBy,
+  type PortalBrandHeaderProps,
+  type PoweredByProps,
+} from './Branding';

@@ -13,6 +13,7 @@ import {
 } from './ui/Dialog';
 import type { Endpoint, EndpointDetail, RotateSecretResult } from '../types';
 import { cn } from '../utils/cn';
+import { useTranslation } from '../context/I18nContext';
 
 export interface EndpointFormProps {
   /**
@@ -47,6 +48,7 @@ export function EndpointForm({
   className,
 }: EndpointFormProps) {
   const { createEndpoint, updateEndpoint, isCreating, isUpdating } = useEndpoints();
+  const { t } = useTranslation();
   const [url, setUrl] = useState(endpoint?.url ?? '');
   const [description, setDescription] = useState(endpoint?.description ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function EndpointForm({
     try {
       new URL(url);
     } catch {
-      setError('Please enter a valid URL');
+      setError(t('form.invalidUrl'));
       return;
     }
 
@@ -86,7 +88,7 @@ export function EndpointForm({
         onSuccess?.(result.data, result.data.secret);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save endpoint');
+      setError(err instanceof Error ? err.message : t('form.saveFailed'));
     }
   };
 
@@ -96,14 +98,14 @@ export function EndpointForm({
       <Dialog open onOpenChange={() => setCreatedSecret(null)}>
         <DialogContent className="hkb-secret-dialog">
           <DialogHeader>
-            <DialogTitle>Endpoint Created</DialogTitle>
+            <DialogTitle>{t('form.createdTitle')}</DialogTitle>
             <DialogDescription>
-              Save this signing secret securely. You won't be able to see it again.
+              {t('form.createdDescription')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="hkb-secret-container">
-            <Label>Signing Secret</Label>
+            <Label>{t('form.signingSecret')}</Label>
             <div className="hkb-secret-value">
               <code>{createdSecret}</code>
               <Button
@@ -111,13 +113,13 @@ export function EndpointForm({
                 size="sm"
                 onClick={() => navigator.clipboard.writeText(createdSecret)}
               >
-                Copy
+                {t('common.copy')}
               </Button>
             </div>
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setCreatedSecret(null)}>Done</Button>
+            <Button onClick={() => setCreatedSecret(null)}>{t('common.done')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -128,16 +130,16 @@ export function EndpointForm({
     <Card className={cn('hkb-endpoint-form', className)}>
       <form onSubmit={handleSubmit}>
         <CardHeader>
-          <CardTitle>{isEdit ? 'Edit Endpoint' : 'Create Endpoint'}</CardTitle>
+          <CardTitle>{isEdit ? t('form.editTitle') : t('form.createTitle')}</CardTitle>
         </CardHeader>
 
         <CardContent>
           <div className="hkb-form-field">
-            <Label htmlFor="endpoint-url">Endpoint URL</Label>
+            <Label htmlFor="endpoint-url">{t('form.urlLabel')}</Label>
             <Input
               id="endpoint-url"
               type="url"
-              placeholder="https://your-app.com/webhooks"
+              placeholder={t('form.urlPlaceholder')}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               error={!!error}
@@ -146,10 +148,10 @@ export function EndpointForm({
           </div>
 
           <div className="hkb-form-field">
-            <Label htmlFor="endpoint-description">Description (optional)</Label>
+            <Label htmlFor="endpoint-description">{t('form.descriptionLabel')}</Label>
             <Textarea
               id="endpoint-description"
-              placeholder="What is this endpoint for?"
+              placeholder={t('form.descriptionPlaceholder')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -162,17 +164,17 @@ export function EndpointForm({
         <CardFooter>
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           )}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? isEdit
-                ? 'Saving...'
-                : 'Creating...'
+                ? t('form.saving')
+                : t('form.creating')
               : isEdit
-                ? 'Save'
-                : 'Create Endpoint'}
+                ? t('form.save')
+                : t('form.create')}
           </Button>
         </CardFooter>
       </form>
@@ -198,6 +200,7 @@ export function EndpointSecretRotation({
   onCancel,
 }: EndpointSecretRotationProps) {
   const { rotateSecret, isRotating } = useEndpoints();
+  const { t, formatDate } = useTranslation();
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [previousSecretExpiresAt, setPreviousSecretExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -213,7 +216,7 @@ export function EndpointSecretRotation({
       setPreviousSecretExpiresAt(result.data.previousSecretExpiresAt);
       onSuccess?.(result.data.secret, result.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to rotate secret');
+      setError(err instanceof Error ? err.message : t('rotate.failed'));
     }
   };
 
@@ -222,18 +225,17 @@ export function EndpointSecretRotation({
       <Dialog open onOpenChange={() => setNewSecret(null)}>
         <DialogContent className="hkb-secret-dialog">
           <DialogHeader>
-            <DialogTitle>Secret Rotated</DialogTitle>
+            <DialogTitle>{t('rotate.rotatedTitle')}</DialogTitle>
             <DialogDescription>
-              Your endpoint now has a new signing secret. Update your application
-              with this new secret.
+              {t('rotate.rotatedDescription')}
               {previousSecretExpiresAt &&
                 new Date(previousSecretExpiresAt).getTime() > Date.now() &&
-                ` The old secret keeps working until ${new Date(previousSecretExpiresAt).toLocaleString()}.`}
+                ` ${t('rotate.oldSecretUntil', { date: formatDate(previousSecretExpiresAt) })}`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="hkb-secret-container">
-            <Label>New Signing Secret</Label>
+            <Label>{t('rotate.newSecret')}</Label>
             <div className="hkb-secret-value">
               <code>{newSecret}</code>
               <Button
@@ -241,13 +243,13 @@ export function EndpointSecretRotation({
                 size="sm"
                 onClick={() => navigator.clipboard.writeText(newSecret)}
               >
-                Copy
+                {t('common.copy')}
               </Button>
             </div>
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setNewSecret(null)}>Done</Button>
+            <Button onClick={() => setNewSecret(null)}>{t('common.done')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -257,19 +259,18 @@ export function EndpointSecretRotation({
   return (
     <Card className="hkb-secret-rotation">
       <CardHeader>
-        <CardTitle>Rotate Signing Secret</CardTitle>
+        <CardTitle>{t('rotate.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="hkb-text-muted">
-          This will generate a new signing secret for this endpoint. You'll need
-          to update your application with the new secret.
+          {t('rotate.description')}
         </p>
         {error && <p className="hkb-form-error">{error}</p>}
       </CardContent>
       <CardFooter>
         {onCancel && (
           <Button variant="outline" onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         )}
         <Button
@@ -277,7 +278,7 @@ export function EndpointSecretRotation({
           onClick={handleRotate}
           disabled={isRotating}
         >
-          {isRotating ? 'Rotating...' : 'Rotate Secret'}
+          {isRotating ? t('rotate.rotating') : t('rotate.submit')}
         </Button>
       </CardFooter>
     </Card>

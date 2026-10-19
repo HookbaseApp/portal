@@ -9,6 +9,7 @@ import { Skeleton } from './ui/Skeleton';
 import type { EventType } from '../types';
 import { cn } from '../utils/cn';
 import { formatJson } from '../utils/formatJson';
+import { useTranslation } from '../context/I18nContext';
 
 export interface SubscriptionManagerProps {
   /**
@@ -42,9 +43,10 @@ function SubscriptionRow({
   onToggle: () => void;
 }) {
   const examplePreview = formatJson(eventType.examplePayload);
+  const { t } = useTranslation();
 
   return (
-    <div className="hkb-subscription-row" title={examplePreview ? `Example:\n${examplePreview}` : undefined}>
+    <div className="hkb-subscription-row" title={examplePreview ? t('subscriptions.example', { example: examplePreview }) : undefined}>
       <div className="hkb-subscription-info">
         <code className="hkb-subscription-name">{eventType.name}</code>
         {eventType.description && (
@@ -55,7 +57,7 @@ function SubscriptionRow({
         checked={isSubscribed}
         onChange={onToggle}
         disabled={isToggling}
-        aria-label={`Toggle ${eventType.name} subscription`}
+        aria-label={t('subscriptions.toggle', { name: eventType.name })}
       />
     </div>
   );
@@ -102,6 +104,7 @@ export function SubscriptionManager({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const isLoading = isLoadingTypes;
   const isToggling = isCreating || isDeleting;
@@ -140,14 +143,14 @@ export function SubscriptionManager({
         <div className="hkb-subscription-search">
           <Input
             type="search"
-            placeholder="Search events..."
+            placeholder={t('subscriptions.searchEvents')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
         <div className="hkb-subscription-summary">
-          <Badge>{subscribedEventTypeIds.size} subscribed</Badge>
+          <Badge>{t('subscriptions.subscribedCount', { count: subscribedEventTypeIds.size })}</Badge>
         </div>
 
         <div className="hkb-subscription-list">
@@ -169,15 +172,15 @@ export function SubscriptionManager({
   return (
     <Card className={cn('hkb-subscription-manager', className)}>
       <CardHeader>
-        <CardTitle>Event Subscriptions</CardTitle>
-        <Badge>{subscribedEventTypeIds.size} subscribed</Badge>
+        <CardTitle>{t('subscriptions.title')}</CardTitle>
+        <Badge>{t('subscriptions.subscribedCount', { count: subscribedEventTypeIds.size })}</Badge>
       </CardHeader>
 
       <CardContent>
         <div className="hkb-subscription-search">
           <Input
             type="search"
-            placeholder="Search event types..."
+            placeholder={t('eventTypes.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -187,7 +190,7 @@ export function SubscriptionManager({
           // Flat list when searching
           <div className="hkb-subscription-list">
             {filteredEventTypes.length === 0 ? (
-              <p className="hkb-text-muted">No matching event types</p>
+              <p className="hkb-text-muted">{t('subscriptions.noMatch')}</p>
             ) : (
               filteredEventTypes.map((eventType) => (
                 <SubscriptionRow
@@ -204,7 +207,9 @@ export function SubscriptionManager({
           // Categorized list
           categories.map((category) => (
             <div key={category} className="hkb-subscription-category">
-              <h4 className="hkb-subscription-category-title">{category}</h4>
+              <h4 className="hkb-subscription-category-title">
+                {category === 'Other' ? t('eventTypes.categoryOther') : category}
+              </h4>
               <div className="hkb-subscription-list">
                 {groupedByCategory[category].map((eventType) => (
                   <SubscriptionRow

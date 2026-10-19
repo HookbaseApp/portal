@@ -7,6 +7,7 @@ import { Skeleton } from './ui/Skeleton';
 import type { EventType } from '../types';
 import { cn } from '../utils/cn';
 import { formatJson } from '../utils/formatJson';
+import { useTranslation } from '../context/I18nContext';
 
 export interface EventTypeListProps {
   /**
@@ -38,6 +39,7 @@ function EventTypeCard({
   onClick?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
 
   const hasExtra = eventType.examplePayload != null || !!eventType.documentationUrl;
 
@@ -78,14 +80,14 @@ function EventTypeCard({
             <button
               className="hkb-event-type-expand-btn"
               onClick={handleToggle}
-              aria-label={expanded ? 'Collapse' : 'Expand'}
+              aria-label={expanded ? t('eventTypes.collapse') : t('eventTypes.expand')}
             >
               {expanded ? '▼' : '▶'}
             </button>
           )}
         </div>
         <div className="hkb-event-type-header-right">
-          {isSelected && <Badge variant="success">Subscribed</Badge>}
+          {isSelected && <Badge variant="success">{t('eventTypes.subscribed')}</Badge>}
           {eventType.documentationUrl && (
             <a
               href={eventType.documentationUrl}
@@ -94,7 +96,7 @@ function EventTypeCard({
               className="hkb-event-type-doc-link"
               onClick={(e) => e.stopPropagation()}
             >
-              Docs
+              {t('eventTypes.docs')}
             </a>
           )}
         </div>
@@ -113,7 +115,7 @@ function EventTypeCard({
       )}
       {expanded && parsedExample && (
         <div className="hkb-event-type-example">
-          <h5 className="hkb-event-type-example-title">Example Payload</h5>
+          <h5 className="hkb-event-type-example-title">{t('eventTypes.examplePayload')}</h5>
           <pre className="hkb-event-type-example-code">
             <code>{parsedExample}</code>
           </pre>
@@ -151,6 +153,7 @@ export function EventTypeList({
   const { eventTypes, groupedByCategory, categories, isLoading, isError, error } =
     useEventTypes();
   const [searchQuery, setSearchQuery] = useState('');
+  const { t } = useTranslation();
 
   // Filter event types by search query
   const filteredCategories = useMemo(() => {
@@ -187,7 +190,7 @@ export function EventTypeList({
   if (isError) {
     return (
       <div className="hkb-error">
-        <p>Failed to load event types</p>
+        <p>{t('eventTypes.loadFailed')}</p>
         <p className="hkb-error-message">{error?.message}</p>
       </div>
     );
@@ -196,7 +199,7 @@ export function EventTypeList({
   if (eventTypes.length === 0) {
     return (
       <div className="hkb-empty-state">
-        <p>No event types available</p>
+        <p>{t('eventTypes.empty')}</p>
       </div>
     );
   }
@@ -207,7 +210,7 @@ export function EventTypeList({
         <div className="hkb-event-type-search">
           <Input
             type="search"
-            placeholder="Search event types..."
+            placeholder={t('eventTypes.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -216,12 +219,14 @@ export function EventTypeList({
 
       {filteredCategories.categories.length === 0 ? (
         <div className="hkb-empty-state hkb-empty-state--small">
-          <p>No event types match your search</p>
+          <p>{t('eventTypes.noMatch')}</p>
         </div>
       ) : (
         filteredCategories.categories.map((category) => (
           <div key={category} className="hkb-event-type-category">
-            <h4 className="hkb-event-type-category-title">{category}</h4>
+            <h4 className="hkb-event-type-category-title">
+              {category === 'Other' ? t('eventTypes.categoryOther') : category}
+            </h4>
             <div className="hkb-event-type-category-items">
               {filteredCategories.groupedByCategory[category].map((eventType) => (
                 <EventTypeCard
