@@ -183,7 +183,7 @@ Or override CSS variables directly:
 
 ## Branding
 
-Organizations configure portal branding in the Hookbase dashboard (Settings → Portal branding;
+Organizations configure portal branding in the Hookbase dashboard (Outbound → Webhooks → Customer portal;
 Starter plan and above): logo, primary and accent colours, light/dark/auto theme, display name,
 support URL/email, default locale, and a fixed set of colour variables. The portal token API
 serves it at `GET /portal/branding`:
