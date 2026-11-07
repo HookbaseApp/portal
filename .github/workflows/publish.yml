@@ -10,14 +10,23 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@hookbase/portal
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
+
+      # Trusted publishing (OIDC, no NPM_TOKEN) needs npm 11.5.1 or later.
+      - name: Update npm
+        run: npm install -g npm@11
 
       - run: npm ci
 
@@ -47,5 +56,3 @@ jobs:
       - name: Publish
         if: steps.version-check.outputs.exists == 'false'
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
