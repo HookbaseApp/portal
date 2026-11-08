@@ -59,6 +59,18 @@ describe('catalogs', () => {
   }
 });
 
+describe('message status labels', () => {
+  // Every MessageStatus (src/types). MessageLog's STATUS_KEYS is typed by it; this checks the catalogs.
+  const STATUSES = ['pending', 'processing', 'success', 'failed', 'awaiting_retry', 'held', 'awaiting_pull', 'fifo_waiting', 'exhausted', 'dlq'];
+
+  for (const locale of SUPPORTED_LOCALES) {
+    it(`${locale} labels every message status`, () => {
+      const catalog = CATALOGS[locale] as Record<string, string>;
+      for (const status of STATUSES) expect({ status, label: catalog[`messages.status.${status}`] }).toEqual({ status, label: expect.any(String) });
+    });
+  }
+});
+
 describe('createTranslator', () => {
   it('interpolates placeholders', () => {
     const t = createTranslator('es');

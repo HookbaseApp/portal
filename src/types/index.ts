@@ -73,6 +73,12 @@ export type MessageStatus =
   | 'success'
   | 'failed'
   | 'awaiting_retry'
+  /** Waiting while the endpoint's circuit breaker is open; sent once it recovers. */
+  | 'held'
+  /** A polling endpoint's message, waiting for the consumer to fetch it. */
+  | 'awaiting_pull'
+  /** Queued behind an earlier message on a FIFO endpoint. */
+  | 'fifo_waiting'
   | 'exhausted'
   | 'dlq';
 
@@ -91,6 +97,12 @@ export interface OutboundMessage {
   lastAttemptAt: string | null;
   /** When the next retry is due (status `awaiting_retry`). */
   nextAttemptAt: string | null;
+  /**
+   * When a held message's hold ends (status `held`): if the endpoint hasn't recovered by then, the
+   * message moves to the dead letter queue. null for any other status. Optional so a host app that
+   * builds these objects itself still compiles after a minor upgrade.
+   */
+  holdExpiresAt?: string | null;
   /** Whether `POST /portal/messages/:id/replay` will accept this message. */
   replayable: boolean;
   createdAt: string;

@@ -127,7 +127,8 @@ View delivery history and message status.
 <MessageLog
   endpointId={endpoint.id}             // Filter by endpoint (optional)
   status="awaiting_retry"              // Filter by status (optional): pending, processing, success,
-                                       //   failed, awaiting_retry, exhausted, dlq
+                                       //   failed, awaiting_retry, held, awaiting_pull, fifo_waiting,
+                                       //   exhausted, dlq
   limit={50}                           // Messages per page (max 100)
   refreshInterval={30000}              // Auto-refresh in ms (0 to disable)
   showAttempts={true}                  // Per-message "Attempts" toggle
@@ -136,6 +137,8 @@ View delivery history and message status.
 ```
 
 History is paged with Previous/Next. The API pages by cursor, so there is no total count.
+
+A `held` message is waiting while its endpoint's circuit breaker is open, without spending attempts; it is sent once the endpoint recovers. Its row says when the hold ends (`holdExpiresAt`): if the endpoint hasn't recovered by then, the message moves to the dead letter queue. `awaiting_pull` messages wait for a polling endpoint's consumer, and `fifo_waiting` ones queue behind an earlier message on a FIFO endpoint.
 
 ### EndpointSecretRotation
 

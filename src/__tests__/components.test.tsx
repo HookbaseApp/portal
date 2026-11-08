@@ -52,6 +52,7 @@ function message(id: string, over: Partial<OutboundMessage> = {}): OutboundMessa
     lastErrorMessage: null,
     lastAttemptAt: '2026-10-01T12:00:01.000Z',
     nextAttemptAt: null,
+    holdExpiresAt: null,
     replayable: false,
     createdAt: '2026-10-01T12:00:00.000Z',
     completedAt: '2026-10-01T12:00:01.000Z',
@@ -155,6 +156,33 @@ describe('MessageLog', () => {
     expect(retries).toHaveLength(1);
     fireEvent.click(retries[0]);
     await waitFor(() => expect(requests.some((r) => r.url.pathname === '/portal/messages/b/replay')).toBe(true));
+  });
+
+  it('shows a held message with an amber badge and when its hold ends, and labels the waiting statuses', async () => {
+    handlers.push(on('GET', '/portal/messages', () => ({
+      body: {
+        data: [
+          message('h', { status: 'held', attempts: 0, holdExpiresAt: '2026-11-10T12:00:00.000Z', lastErrorMessage: 'HTTP 503' }),
+          message('p', { status: 'awaiting_pull', attempts: 0 }),
+          message('f', { status: 'fifo_waiting', attempts: 0 }),
+          // Not held: a stray holdExpiresAt is not shown.
+          message('r', { status: 'awaiting_retry', holdExpiresAt: '2026-11-10T12:00:00.000Z' }),
+        ],
+        pagination: { hasMore: false, nextCursor: null },
+      },
+    })));
+
+    renderInPortal(<MessageLog showAttempts={false} />);
+
+    const held = await screen.findByText('Held');
+    expect(held.className).toContain('hkb-badge--held');
+    expect(screen.getByText('Awaiting pull').className).toContain('hkb-badge--warning');
+    expect(screen.getByText('Queued (FIFO)').className).toContain('hkb-badge--warning');
+    const notes = screen.getAllByText(/^Held until the endpoint recovers\. If it hasn't by .+, the message moves to the dead letter queue\.$/);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].textContent).not.toContain('{date}');
+    expect(screen.queryByText(/^Next retry/)).toBeNull();
+    expect(screen.getByText('HTTP 503')).toBeTruthy();
   });
 
   it('shows the API reason when a replay is refused', async () => {

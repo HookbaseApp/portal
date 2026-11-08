@@ -55,24 +55,33 @@ function getStatusBadgeVariant(status: MessageStatus) {
     case 'pending':
     case 'processing':
     case 'awaiting_retry':
+    case 'awaiting_pull':
+    case 'fifo_waiting':
       return 'warning';
+    case 'held':
+      return 'held';
     default:
       return 'default';
   }
 }
 
-const STATUS_KEYS: Record<string, PortalMessageKey> = {
+/** A label for every message status; typed by MessageStatus so a new status can't go unlabelled. */
+const STATUS_KEYS: Record<MessageStatus, PortalMessageKey> = {
   success: 'messages.status.success',
   failed: 'messages.status.failed',
   awaiting_retry: 'messages.status.awaiting_retry',
+  held: 'messages.status.held',
+  awaiting_pull: 'messages.status.awaiting_pull',
+  fifo_waiting: 'messages.status.fifo_waiting',
   exhausted: 'messages.status.exhausted',
   dlq: 'messages.status.dlq',
   pending: 'messages.status.pending',
   processing: 'messages.status.processing',
 };
 
+/** Also labels attempt statuses (success, failed); anything unknown is shown as it is. */
 function formatStatus(status: string, t: TranslationValue['t']) {
-  const key = STATUS_KEYS[status];
+  const key = (STATUS_KEYS as Partial<Record<string, PortalMessageKey>>)[status];
   return key ? t(key) : status;
 }
 
@@ -184,6 +193,11 @@ function MessageRow({
             </>
           )}
         </div>
+        {message.status === 'held' && message.holdExpiresAt && (
+          <p className="hkb-message-hold">
+            {t('messages.heldUntil', { date: formatDate(message.holdExpiresAt) })}
+          </p>
+        )}
         {message.lastErrorMessage && message.status !== 'success' && (
           <p className="hkb-message-error">{message.lastErrorMessage}</p>
         )}
