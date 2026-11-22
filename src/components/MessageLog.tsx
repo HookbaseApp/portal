@@ -57,6 +57,7 @@ function getStatusBadgeVariant(status: MessageStatus) {
     case 'awaiting_retry':
     case 'awaiting_pull':
     case 'fifo_waiting':
+    case 'awaiting_ack':
       return 'warning';
     case 'held':
       return 'held';
@@ -73,16 +74,37 @@ const STATUS_KEYS: Record<MessageStatus, PortalMessageKey> = {
   held: 'messages.status.held',
   awaiting_pull: 'messages.status.awaiting_pull',
   fifo_waiting: 'messages.status.fifo_waiting',
+  awaiting_ack: 'messages.status.awaiting_ack',
   exhausted: 'messages.status.exhausted',
   dlq: 'messages.status.dlq',
   pending: 'messages.status.pending',
   processing: 'messages.status.processing',
 };
 
-/** Also labels attempt statuses (success, failed); anything unknown is shown as it is. */
+/** The attempt statuses that aren't message statuses: accepted (async ack) and timeout. */
+const ATTEMPT_STATUS_KEYS: Partial<Record<string, PortalMessageKey>> = {
+  accepted: 'messages.status.accepted',
+  timeout: 'messages.status.timeout',
+};
+
+/** Also labels attempt statuses (success, failed, accepted, timeout); anything unknown is shown as it is. */
 function formatStatus(status: string, t: TranslationValue['t']) {
-  const key = (STATUS_KEYS as Partial<Record<string, PortalMessageKey>>)[status];
+  const key = (STATUS_KEYS as Partial<Record<string, PortalMessageKey>>)[status] ?? ATTEMPT_STATUS_KEYS[status];
   return key ? t(key) : status;
+}
+
+function getAttemptBadgeVariant(status: string) {
+  switch (status) {
+    case 'success':
+      return 'success';
+    case 'failed':
+    case 'timeout':
+      return 'destructive';
+    case 'accepted':
+      return 'warning';
+    default:
+      return 'default';
+  }
 }
 
 /**
@@ -122,13 +144,20 @@ function MessageAttempts({ messageId }: { messageId: string }) {
       {attempts.map((attempt) => (
         <li key={attempt.id} className="hkb-message-attempt">
           <span className="hkb-message-attempt-number">#{attempt.attemptNumber}</span>
-          <Badge variant={attempt.status === 'success' ? 'success' : attempt.status === 'failed' ? 'destructive' : 'default'}>
+          <Badge variant={getAttemptBadgeVariant(attempt.status)}>
             {formatStatus(attempt.status, t)}
           </Badge>
           {attempt.responseStatus != null && <span>HTTP {attempt.responseStatus}</span>}
           {attempt.responseTimeMs != null && <span>{attempt.responseTimeMs}ms</span>}
           {attempt.errorMessage && <span className="hkb-message-attempt-error">{attempt.errorMessage}</span>}
           <span className="hkb-message-time-absolute">{formatDate(attempt.createdAt)}</span>
+          {attempt.ackedAt && (
+            // The endpoint wrote ackMessage: React renders it as text, never as markup.
+            <span className="hkb-message-attempt-ack">
+              {t('messages.acked', { date: formatDate(attempt.ackedAt) })}
+              {attempt.ackMessage ? `: ${attempt.ackMessage}` : ''}
+            </span>
+          )}
         </li>
       ))}
     </ol>
@@ -196,6 +225,11 @@ function MessageRow({
         {message.status === 'held' && message.holdExpiresAt && (
           <p className="hkb-message-hold">
             {t('messages.heldUntil', { date: formatDate(message.holdExpiresAt) })}
+          </p>
+        )}
+        {message.status === 'awaiting_ack' && message.ackDeadline && (
+          <p className="hkb-message-ack">
+            {t('messages.ackDue', { date: formatDate(message.ackDeadline) })}
           </p>
         )}
         {message.lastErrorMessage && message.status !== 'success' && (

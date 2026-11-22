@@ -987,7 +987,8 @@
   font-size: 0.75rem;
 }
 
-.hkb-message-hold {
+.hkb-message-hold,
+.hkb-message-ack {
   margin: 0.25rem 0 0;
   font-size: 0.8125rem;
   color: hsl(var(--hkb-muted-foreground));
@@ -1028,6 +1029,13 @@
 
 .hkb-message-attempt-error {
   color: hsl(var(--hkb-destructive));
+  overflow-wrap: anywhere;
+}
+
+/* The endpoint's acknowledgement, on a line of its own under the attempt. */
+.hkb-message-attempt-ack {
+  flex-basis: 100%;
+  color: hsl(var(--hkb-muted-foreground));
   overflow-wrap: anywhere;
 }
 
