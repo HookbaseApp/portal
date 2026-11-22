@@ -128,7 +128,7 @@ View delivery history and message status.
   endpointId={endpoint.id}             // Filter by endpoint (optional)
   status="awaiting_retry"              // Filter by status (optional): pending, processing, success,
                                        //   failed, awaiting_retry, held, awaiting_pull, fifo_waiting,
-                                       //   exhausted, dlq
+                                       //   awaiting_ack, exhausted, dlq
   limit={50}                           // Messages per page (max 100)
   refreshInterval={30000}              // Auto-refresh in ms (0 to disable)
   showAttempts={true}                  // Per-message "Attempts" toggle
@@ -139,6 +139,8 @@ View delivery history and message status.
 History is paged with Previous/Next. The API pages by cursor, so there is no total count.
 
 A `held` message is waiting while its endpoint's circuit breaker is open, without spending attempts; it is sent once the endpoint recovers. Its row says when the hold ends (`holdExpiresAt`): if the endpoint hasn't recovered by then, the message moves to the dead letter queue. `awaiting_pull` messages wait for a polling endpoint's consumer, and `fifo_waiting` ones queue behind an earlier message on a FIFO endpoint.
+
+An `awaiting_ack` message went to an endpoint that uses async acknowledgement: it answered `202` and has until `ackDeadline` to acknowledge it, and its row says when that is. Without an acknowledgement by then, the attempt fails and is retried. In the attempts list, such an attempt shows as accepted until the acknowledgement arrives, then as delivered, failed or timed out, with the endpoint's acknowledgement message beside it. The endpoint wrote that message, so it is shown as text.
 
 ### EndpointSecretRotation
 

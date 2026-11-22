@@ -79,6 +79,8 @@ export type MessageStatus =
   | 'awaiting_pull'
   /** Queued behind an earlier message on a FIFO endpoint. */
   | 'fifo_waiting'
+  /** The endpoint answered 202 and has until `ackDeadline` to acknowledge the message (async acknowledgement). */
+  | 'awaiting_ack'
   | 'exhausted'
   | 'dlq';
 
@@ -95,7 +97,7 @@ export interface OutboundMessage {
   lastResponseStatus: number | null;
   lastErrorMessage: string | null;
   lastAttemptAt: string | null;
-  /** When the next retry is due (status `awaiting_retry`). */
+  /** When the next retry is due (status `awaiting_retry`); null while `held` or `awaiting_ack`. */
   nextAttemptAt: string | null;
   /**
    * When a held message's hold ends (status `held`): if the endpoint hasn't recovered by then, the
@@ -103,6 +105,11 @@ export interface OutboundMessage {
    * builds these objects itself still compiles after a minor upgrade.
    */
   holdExpiresAt?: string | null;
+  /**
+   * When an `awaiting_ack` message's accepted (202) attempt times out unless the endpoint acknowledges
+   * it; the attempt then fails and is retried. null for any other status. Optional like holdExpiresAt.
+   */
+  ackDeadline?: string | null;
   /** Whether `POST /portal/messages/:id/replay` will accept this message. */
   replayable: boolean;
   createdAt: string;
@@ -124,6 +131,11 @@ export interface MessageAttempt {
   id: string;
   messageId: string;
   attemptNumber: number;
+  /**
+   * success, failed or timeout; `accepted` while an async-ack endpoint's 202 waits for its
+   * acknowledgement (it then becomes success, failed with errorType `ack_failed`, or timeout with
+   * `ack_timeout`).
+   */
   status: string;
   responseStatus: number | null;
   responseTimeMs: number | null;
@@ -131,6 +143,11 @@ export interface MessageAttempt {
   errorMessage: string | null;
   createdAt: string;
   completedAt: string | null;
+  /** When the endpoint acknowledged this attempt; null until then. Optional like holdExpiresAt. */
+  ackedAt?: string | null;
+  /** The endpoint's own text and JSON from its acknowledgement: untrusted, so show them as text. */
+  ackMessage?: string | null;
+  ackResult?: unknown;
 }
 
 /** `GET /portal/application`. */

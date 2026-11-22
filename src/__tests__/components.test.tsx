@@ -198,6 +198,51 @@ describe('MessageLog', () => {
     expect(await screen.findByText('Message status is "pending".')).toBeTruthy();
   });
 
+  it('shows an awaiting_ack message with a warning badge and when its ack is due', async () => {
+    handlers.push(on('GET', '/portal/messages', () => ({
+      body: {
+        data: [
+          message('k', { status: 'awaiting_ack', lastResponseStatus: 202, ackDeadline: '2026-11-22T05:00:00.000Z' }),
+          // Not awaiting an ack: a stray ackDeadline is not shown.
+          message('s', { status: 'success', ackDeadline: '2026-11-22T05:00:00.000Z' }),
+        ],
+        pagination: { hasMore: false, nextCursor: null },
+      },
+    })));
+
+    renderInPortal(<MessageLog showAttempts={false} />);
+
+    expect((await screen.findByText('Awaiting ack')).className).toContain('hkb-badge--warning');
+    const notes = screen.getAllByText(/^The endpoint answered 202 and must acknowledge it by .+\. Without an acknowledgement, the attempt fails and is retried\.$/);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].textContent).not.toContain('{date}');
+    expect(screen.queryByText(/^Next retry/)).toBeNull();
+  });
+
+  it('labels accepted and timed-out attempts and shows the endpoint\'s ack as text', async () => {
+    handlers.push(on('GET', '/portal/messages', () => ({
+      body: { data: [message('m2', { status: 'awaiting_ack', attempts: 3, ackDeadline: '2026-11-22T05:00:00.000Z' })], pagination: { hasMore: false, nextCursor: null } },
+    })));
+    handlers.push(on('GET', '/portal/messages/m2/attempts', () => ({
+      body: { data: [
+        { id: 'a1', messageId: 'm2', attemptNumber: 1, status: 'failed', responseStatus: 202, responseTimeMs: 30, errorType: 'ack_failed', errorMessage: 'Receiver reported failure', createdAt: '2026-11-22T03:00:00.000Z', completedAt: null, ackedAt: '2026-11-22T03:01:00.000Z', ackMessage: '<img src=x onerror=alert(1)> db down', ackResult: { retry: true } },
+        { id: 'a2', messageId: 'm2', attemptNumber: 2, status: 'timeout', responseStatus: 202, responseTimeMs: 30, errorType: 'ack_timeout', errorMessage: 'No acknowledgement by the deadline', createdAt: '2026-11-22T03:30:00.000Z', completedAt: null, ackedAt: null, ackMessage: null, ackResult: null },
+        { id: 'a3', messageId: 'm2', attemptNumber: 3, status: 'accepted', responseStatus: 202, responseTimeMs: 30, errorType: null, errorMessage: null, createdAt: '2026-11-22T04:00:00.000Z', completedAt: null, ackedAt: null, ackMessage: null, ackResult: null },
+      ] },
+    })));
+
+    const { container } = renderInPortal(<MessageLog />);
+    fireEvent.click(await screen.findByText('Attempts'));
+
+    expect((await screen.findByText('Accepted, awaiting ack')).className).toContain('hkb-badge--warning');
+    expect(screen.getByText('Timed out').className).toContain('hkb-badge--destructive');
+    expect(screen.getByText('No acknowledgement by the deadline')).toBeTruthy();
+    const acks = container.querySelectorAll('.hkb-message-attempt-ack');
+    expect(acks).toHaveLength(1);
+    expect(acks[0].textContent).toMatch(/^Acknowledged .+: <img src=x onerror=alert\(1\)> db down$/);
+    expect(container.querySelector('.hkb-message-attempts img')).toBeNull();
+  });
+
   it('lists a message\'s attempts on demand', async () => {
     handlers.push(on('GET', '/portal/messages', () => ({
       body: { data: [message('m1', { status: 'awaiting_retry', attempts: 2 })], pagination: { hasMore: false, nextCursor: null } },

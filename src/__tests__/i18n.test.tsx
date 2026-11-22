@@ -61,12 +61,19 @@ describe('catalogs', () => {
 
 describe('message status labels', () => {
   // Every MessageStatus (src/types). MessageLog's STATUS_KEYS is typed by it; this checks the catalogs.
-  const STATUSES = ['pending', 'processing', 'success', 'failed', 'awaiting_retry', 'held', 'awaiting_pull', 'fifo_waiting', 'exhausted', 'dlq'];
+  const STATUSES = ['pending', 'processing', 'success', 'failed', 'awaiting_retry', 'held', 'awaiting_pull', 'fifo_waiting', 'awaiting_ack', 'exhausted', 'dlq'];
+  // Attempt-only statuses (MessageLog's ATTEMPT_STATUS_KEYS).
+  const ATTEMPT_STATUSES = ['accepted', 'timeout'];
 
   for (const locale of SUPPORTED_LOCALES) {
     it(`${locale} labels every message status`, () => {
       const catalog = CATALOGS[locale] as Record<string, string>;
-      for (const status of STATUSES) expect({ status, label: catalog[`messages.status.${status}`] }).toEqual({ status, label: expect.any(String) });
+      for (const status of [...STATUSES, ...ATTEMPT_STATUSES]) expect({ status, label: catalog[`messages.status.${status}`] }).toEqual({ status, label: expect.any(String) });
+    });
+
+    it(`${locale} puts the date in the async-ack sentences`, () => {
+      const catalog = CATALOGS[locale] as Record<string, string>;
+      for (const key of ['messages.ackDue', 'messages.acked']) expect({ key, text: catalog[key] }).toEqual({ key, text: expect.stringContaining('{date}') });
     });
   }
 });
